@@ -7,6 +7,13 @@ import android.content.Intent
 import androidx.core.content.FileProvider
 import java.io.File
 
+/** Позначка, що додаток сам відкриває зовнішній екран, тож повертатися в нього можна без відбитка. */
+object ExternalLaunch {
+    @Volatile private var pending = false
+    fun mark() { pending = true }
+    fun consume(): Boolean = pending.also { pending = false }
+}
+
 private fun uriFor(ctx: Context, file: File) =
     FileProvider.getUriForFile(ctx, "${ctx.packageName}.files", file)
 
@@ -17,9 +24,11 @@ fun openDocument(ctx: Context, file: File, mime: String): Boolean {
         .setDataAndType(uriFor(ctx, file), mime)
         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     return try {
+        ExternalLaunch.mark()
         ctx.startActivity(intent)
         true
     } catch (e: ActivityNotFoundException) {
+        ExternalLaunch.consume()
         false
     }
 }
@@ -34,5 +43,6 @@ fun shareDocument(ctx: Context, file: File, mime: String, title: String) {
         .putExtra(Intent.EXTRA_SUBJECT, title)
         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     send.clipData = ClipData.newRawUri(title, uri)
+    ExternalLaunch.mark()
     ctx.startActivity(Intent.createChooser(send, "Надіслати"))
 }

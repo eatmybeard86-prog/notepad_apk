@@ -56,9 +56,11 @@ class DutyRepository(private val context: Context, private val db: DiaryDatabase
         val displayName = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
             ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
             ?: "Інструкція"
-        val mime = resolver.getType(uri) ?: mimeFromName(displayName)
+        val reported = resolver.getType(uri)
+        val mime = if (reported == null || reported == "application/octet-stream") mimeFromName(displayName) else reported
         val fileName = "${UUID.randomUUID()}.${extensionOf(displayName, mime)}"
-        resolver.openInputStream(uri)!!.use { input ->
+        val input0 = resolver.openInputStream(uri) ?: error("файл недоступний")
+        input0.use { input ->
             File(docsDir, fileName).outputStream().use { input.copyTo(it) }
         }
         fileOf(cur)?.delete()
@@ -110,6 +112,10 @@ class DutyRepository(private val context: Context, private val db: DiaryDatabase
             "application/pdf",
             "application/msword",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            // Деякі файлові менеджери і месенджери віддають DOC/DOCX саме так
+            "application/octet-stream",
+            "application/vnd.ms-word",
+            "application/x-msword",
         )
 
         fun mimeFromName(name: String): String {

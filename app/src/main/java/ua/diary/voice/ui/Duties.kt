@@ -164,19 +164,22 @@ fun UnitScreen(vm: DiaryViewModel, unitId: Long) {
     var renaming by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
     var addingPosition by remember { mutableStateOf(false) }
-    // Посада, для якої зараз вибирається файл
-    var attachTarget by remember { mutableStateOf<DutyPosition?>(null) }
 
     LaunchedEffect(message) { message?.let { snackbar.showSnackbar(it); vm.clearMessage() } }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        val target = attachTarget
-        attachTarget = null
-        if (uri != null && target != null) vm.attachDocument(target, uri)
+        vm.attachPicked(uri)
     }
     fun pickFor(p: DutyPosition) {
-        attachTarget = p
-        picker.launch(DutyRepository.DOC_MIME_TYPES)
+        vm.attachTargetId = p.id
+        ExternalLaunch.mark()
+        try {
+            picker.launch(DutyRepository.DOC_MIME_TYPES)
+        } catch (e: android.content.ActivityNotFoundException) {
+            ExternalLaunch.consume()
+            vm.attachTargetId = null
+            vm.showMessage("На телефоні немає програми для вибору файлів")
+        }
     }
     fun open(p: DutyPosition) {
         val f = vm.duty.fileOf(p) ?: return

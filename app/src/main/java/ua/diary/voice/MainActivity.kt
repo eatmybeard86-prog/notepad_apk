@@ -8,7 +8,10 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Modifier
 import androidx.appcompat.app.AppCompatActivity
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK
@@ -27,6 +30,7 @@ import ua.diary.voice.ui.isDark
 import ua.diary.voice.ui.supportsDynamicColor
 import ua.diary.voice.ui.DiaryViewModel
 import ua.diary.voice.ui.EntryScreen
+import ua.diary.voice.ui.ExternalLaunch
 import ua.diary.voice.ui.HomeScreen
 import ua.diary.voice.ui.LockScreen
 import ua.diary.voice.ui.UnitScreen
@@ -63,9 +67,9 @@ class MainActivity : AppCompatActivity() {
                 enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
             }
             DiaryTheme(paletteId, darkMode) {
-                if (needsLock) {
-                    LockScreen(onUnlock = ::authenticate)
-                } else {
+                // Вміст лишається в композиції навіть під блокуванням, щоб не губилися
+                // результати вибору файлу та інших зовнішніх екранів.
+                Box(Modifier.fillMaxSize()) {
                     val vm: DiaryViewModel = viewModel()
                     val editor by vm.editor.collectAsStateWithLifecycle()
                     val openUnit by vm.openUnitId.collectAsStateWithLifecycle()
@@ -90,6 +94,10 @@ class MainActivity : AppCompatActivity() {
                             onDarkMode = { darkMode = it; prefs.edit().putString(KEY_DARK, it.name).apply() },
                         )
                     }
+                    if (needsLock) {
+                        BackHandler { finish() }
+                        LockScreen(onUnlock = ::authenticate)
+                    }
                 }
             }
         }
@@ -102,7 +110,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStop() {
         super.onStop()
-        // Після виходу з додатка знову просимо відбиток
+        // Після виходу з додатка знову просимо відбиток. Але не тоді, коли ми самі відкрили
+        // вибір файлу, переглядач документа чи «Надіслати».
+        if (ExternalLaunch.consume()) return
         if (!isChangingConfigurations && lockEnabled) unlocked = false
     }
 

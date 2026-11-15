@@ -113,6 +113,21 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Посада, для якої відкрито вибір файлу. */
+    var attachTargetId: Long? = null
+
+    fun attachPicked(uri: Uri?) {
+        val id = attachTargetId ?: return
+        attachTargetId = null
+        if (uri == null) return
+        val p = units.value.flatMap { it.positions }.firstOrNull { it.id == id }
+        viewModelScope.launch {
+            runCatching { duty.attachDocument(id, uri) }
+                .onSuccess { _message.value = "Інструкцію закріплено" + (p?.let { " за посадою «${it.name}»" } ?: "") }
+                .onFailure { _message.value = "Не вдалося прочитати файл: ${it.message ?: it.javaClass.simpleName}" }
+        }
+    }
+
     fun detachDocument(p: DutyPosition) {
         viewModelScope.launch { duty.detachDocument(p) }
     }
