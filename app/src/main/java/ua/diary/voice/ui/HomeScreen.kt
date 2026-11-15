@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
@@ -62,7 +63,16 @@ import java.time.YearMonth
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(vm: DiaryViewModel, lockEnabled: Boolean, onToggleLock: (Boolean) -> Unit) {
+fun HomeScreen(
+    vm: DiaryViewModel,
+    lockEnabled: Boolean,
+    onToggleLock: (Boolean) -> Unit,
+    paletteId: String,
+    darkMode: DarkMode,
+    onPalette: (String) -> Unit,
+    onDarkMode: (DarkMode) -> Unit,
+) {
+    var themeDialog by remember { mutableStateOf(false) }
     val entries by vm.entries.collectAsStateWithLifecycle()
     val topics by vm.topics.collectAsStateWithLifecycle()
     val topicFilter by vm.topicFilter.collectAsStateWithLifecycle()
@@ -103,6 +113,11 @@ fun HomeScreen(vm: DiaryViewModel, lockEnabled: Boolean, onToggleLock: (Boolean)
                                     vm.showMessage("Скопійовано записів: ${entries.size}")
                                 }
                             },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Тема оформлення") },
+                            leadingIcon = { Icon(Icons.Default.Palette, null) },
+                            onClick = { menu = false; themeDialog = true },
                         )
                         DropdownMenuItem(
                             text = { Text("Вхід відбитком") },
@@ -207,6 +222,15 @@ fun HomeScreen(vm: DiaryViewModel, lockEnabled: Boolean, onToggleLock: (Boolean)
             }
             }
         }
+    }
+    if (themeDialog) {
+        ThemeDialog(
+            paletteId = paletteId,
+            darkMode = darkMode,
+            onPalette = onPalette,
+            onDarkMode = onDarkMode,
+            onDismiss = { themeDialog = false },
+        )
     }
 }
 

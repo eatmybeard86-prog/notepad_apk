@@ -1,11 +1,14 @@
 package ua.diary.voice
 
+import android.graphics.Color
 import android.os.Bundle
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.LaunchedEffect
 import androidx.appcompat.app.AppCompatActivity
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK
@@ -17,7 +20,11 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import ua.diary.voice.ui.DarkMode
 import ua.diary.voice.ui.DiaryTheme
+import ua.diary.voice.ui.PALETTE_SYSTEM
+import ua.diary.voice.ui.isDark
+import ua.diary.voice.ui.supportsDynamicColor
 import ua.diary.voice.ui.DiaryViewModel
 import ua.diary.voice.ui.EntryScreen
 import ua.diary.voice.ui.HomeScreen
@@ -32,6 +39,8 @@ class MainActivity : AppCompatActivity() {
     private var lockEnabled by mutableStateOf(true)
     private var unlocked by mutableStateOf(false)
     private var prompting = false
+    private var paletteId by mutableStateOf("violet")
+    private var darkMode by mutableStateOf(DarkMode.SYSTEM)
 
     private fun canAuthenticate() =
         BiometricManager.from(this).canAuthenticate(authenticators) == BiometricManager.BIOMETRIC_SUCCESS
@@ -42,11 +51,18 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         lockEnabled = prefs.getBoolean(KEY_LOCK, true)
+        paletteId = prefs.getString(KEY_PALETTE, null) ?: if (supportsDynamicColor) PALETTE_SYSTEM else "violet"
+        darkMode = runCatching { DarkMode.valueOf(prefs.getString(KEY_DARK, null)!!) }.getOrDefault(DarkMode.SYSTEM)
         unlocked = savedInstanceState?.getBoolean(KEY_UNLOCKED) ?: false
         applySecureFlag()
 
         setContent {
-            DiaryTheme {
+            val dark = isDark(darkMode)
+            LaunchedEffect(dark) {
+                val style = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { dark }
+                enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+            }
+            DiaryTheme(paletteId, darkMode) {
                 if (needsLock) {
                     LockScreen(onUnlock = ::authenticate)
                 } else {
@@ -64,7 +80,15 @@ class MainActivity : AppCompatActivity() {
                             BackHandler { vm.openUnit(null) }
                             UnitScreen(vm, unitId)
                         }
-                        else -> HomeScreen(vm, lockEnabled = lockEnabled, onToggleLock = ::setLock)
+                        else -> HomeScreen(
+                            vm,
+                            lockEnabled = lockEnabled,
+                            onToggleLock = ::setLock,
+                            paletteId = paletteId,
+                            darkMode = darkMode,
+                            onPalette = { paletteId = it; prefs.edit().putString(KEY_PALETTE, it).apply() },
+                            onDarkMode = { darkMode = it; prefs.edit().putString(KEY_DARK, it.name).apply() },
+                        )
                     }
                 }
             }
@@ -132,5 +156,7 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val KEY_LOCK = "lock_enabled"
         private const val KEY_UNLOCKED = "unlocked"
+        private const val KEY_PALETTE = "palette"
+        private const val KEY_DARK = "dark_mode"
     }
 }
