@@ -1,6 +1,7 @@
 package ua.diary.voice.ui
 
 import android.app.Application
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -26,6 +27,10 @@ import ua.diary.voice.audio.VoiceRecorder
 import ua.diary.voice.data.DiaryDatabase
 import ua.diary.voice.data.DiaryEntry
 import ua.diary.voice.data.DiaryRepository
+import ua.diary.voice.data.DutyRepository
+import ua.diary.voice.data.DutyUnit
+import ua.diary.voice.data.DutyPosition
+import ua.diary.voice.data.UnitWithPositions
 import ua.diary.voice.data.EntryWithNotes
 import ua.diary.voice.data.Topic
 import ua.diary.voice.data.VoiceNote
@@ -44,6 +49,65 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = DiaryRepository(DiaryDatabase.get(app))
     private val recorder = VoiceRecorder(app)
     private val player = VoicePlayer()
+    val duty = DutyRepository(app, DiaryDatabase.get(app))
+
+    init {
+        viewModelScope.launch { duty.seedBundledDocuments() }
+    }
+
+    // ---------- Головний екран ----------
+    private val _homeTab = MutableStateFlow(0)
+    val homeTab = _homeTab.asStateFlow()
+    fun setHomeTab(t: Int) { _homeTab.value = t }
+
+    // ---------- Обов'язки ----------
+    val units: StateFlow<List<UnitWithPositions>> =
+        duty.units.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    private val _openUnitId = MutableStateFlow<Long?>(null)
+    val openUnitId = _openUnitId.asStateFlow()
+    fun openUnit(id: Long?) { _openUnitId.value = id }
+
+    fun addUnit(name: String) {
+        if (name.isBlank()) return
+        viewModelScope.launch { duty.addUnit(name) }
+    }
+
+    fun renameUnit(unit: DutyUnit, name: String) {
+        if (name.isBlank()) return
+        viewModelScope.launch { duty.renameUnit(unit, name) }
+    }
+
+    fun deleteUnit(unitId: Long) {
+        if (_openUnitId.value == unitId) _openUnitId.value = null
+        viewModelScope.launch { duty.deleteUnit(unitId) }
+    }
+
+    fun addPosition(unitId: Long, name: String) {
+        if (name.isBlank()) return
+        viewModelScope.launch { duty.addPosition(unitId, name) }
+    }
+
+    fun renamePosition(p: DutyPosition, name: String) {
+        if (name.isBlank()) return
+        viewModelScope.launch { duty.renamePosition(p, name) }
+    }
+
+    fun deletePosition(p: DutyPosition) {
+        viewModelScope.launch { duty.deletePosition(p) }
+    }
+
+    fun attachDocument(p: DutyPosition, uri: Uri) {
+        viewModelScope.launch {
+            runCatching { duty.attachDocument(p.id, uri) }
+                .onSuccess { _message.value = "Інструкцію закріплено за посадою «${p.name}»" }
+                .onFailure { _message.value = "Не вдалося прочитати файл" }
+        }
+    }
+
+    fun detachDocument(p: DutyPosition) {
+        viewModelScope.launch { duty.detachDocument(p) }
+    }
 
     // ---------- Розділи ----------
     val topics: StateFlow<List<Topic>> =

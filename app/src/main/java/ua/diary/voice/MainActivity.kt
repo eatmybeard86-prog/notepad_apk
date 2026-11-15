@@ -22,6 +22,7 @@ import ua.diary.voice.ui.DiaryViewModel
 import ua.diary.voice.ui.EntryScreen
 import ua.diary.voice.ui.HomeScreen
 import ua.diary.voice.ui.LockScreen
+import ua.diary.voice.ui.UnitScreen
 
 class MainActivity : AppCompatActivity() {
     /** Відбиток або, як запасний варіант, PIN/графічний ключ телефона. */
@@ -51,12 +52,19 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     val vm: DiaryViewModel = viewModel()
                     val editor by vm.editor.collectAsStateWithLifecycle()
+                    val openUnit by vm.openUnitId.collectAsStateWithLifecycle()
                     val state = editor
-                    if (state == null) {
-                        HomeScreen(vm, lockEnabled = lockEnabled, onToggleLock = ::setLock)
-                    } else {
-                        BackHandler { vm.closeEditor() }
-                        EntryScreen(vm, state)
+                    val unitId = openUnit
+                    when {
+                        state != null -> {
+                            BackHandler { vm.closeEditor() }
+                            EntryScreen(vm, state)
+                        }
+                        unitId != null -> {
+                            BackHandler { vm.openUnit(null) }
+                            UnitScreen(vm, unitId)
+                        }
+                        else -> HomeScreen(vm, lockEnabled = lockEnabled, onToggleLock = ::setLock)
                     }
                 }
             }

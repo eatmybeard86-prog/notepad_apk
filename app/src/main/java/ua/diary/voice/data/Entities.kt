@@ -40,3 +40,32 @@ data class EntryWithNotes(
     @Relation(parentColumn = "id", entityColumn = "entryId")
     val notes: List<VoiceNote>,
 )
+
+/** Підрозділ у розділі «Обов'язки»: взвод, група тощо. */
+@Entity(tableName = "duty_units")
+data class DutyUnit(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val sortOrder: Int = 0,
+)
+
+/**
+ * Посада у підрозділі. За посадою можна закріпити посадову інструкцію (PDF/DOC/DOCX),
+ * файл лежить у filesDir/docs/[docFileName].
+ */
+@Entity(tableName = "duty_positions", indices = [Index("unitId")])
+data class DutyPosition(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val unitId: Long,
+    val name: String,
+    val sortOrder: Int = 0,
+    val docTitle: String? = null,
+    val docFileName: String? = null,
+    val docMime: String? = null,
+)
+
+data class UnitWithPositions(
+    @Embedded val unit: DutyUnit,
+    @Relation(parentColumn = "id", entityColumn = "unitId")
+    val positions: List<DutyPosition>,
+)

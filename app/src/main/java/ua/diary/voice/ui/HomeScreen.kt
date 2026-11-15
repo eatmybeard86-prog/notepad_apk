@@ -71,7 +71,7 @@ fun HomeScreen(vm: DiaryViewModel, lockEnabled: Boolean, onToggleLock: (Boolean)
     val clipboard = LocalClipboardManager.current
     val snackbar = remember { SnackbarHostState() }
 
-    var tab by rememberSaveable { mutableStateOf(0) }
+    val tab by vm.homeTab.collectAsStateWithLifecycle()
     var showSearch by rememberSaveable { mutableStateOf(query.isNotEmpty()) }
     var menu by remember { mutableStateOf(false) }
     var selectedDay by rememberSaveable { mutableStateOf(LocalDate.now().toEpochDay()) }
@@ -86,7 +86,7 @@ fun HomeScreen(vm: DiaryViewModel, lockEnabled: Boolean, onToggleLock: (Boolean)
             TopAppBar(
                 title = { Text("Щоденник") },
                 actions = {
-                    IconButton(onClick = {
+                    if (tab != 2) IconButton(onClick = {
                         showSearch = !showSearch
                         if (!showSearch) vm.setQuery("")
                     }) { Icon(Icons.Default.Search, "Пошук") }
@@ -115,7 +115,7 @@ fun HomeScreen(vm: DiaryViewModel, lockEnabled: Boolean, onToggleLock: (Boolean)
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
+            if (tab != 2) ExtendedFloatingActionButton(
                 onClick = { vm.newEntry(if (tab == 1) selectedDay else LocalDate.now().toEpochDay()) },
                 icon = { Icon(Icons.Default.Edit, null) },
                 text = { Text("Новий запис") },
@@ -125,9 +125,13 @@ fun HomeScreen(vm: DiaryViewModel, lockEnabled: Boolean, onToggleLock: (Boolean)
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
             TabRow(selectedTabIndex = tab) {
-                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Список") })
-                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Календар") })
+                Tab(selected = tab == 0, onClick = { vm.setHomeTab(0) }, text = { Text("Список") })
+                Tab(selected = tab == 1, onClick = { vm.setHomeTab(1) }, text = { Text("Календар") })
+                Tab(selected = tab == 2, onClick = { vm.setHomeTab(2) }, text = { Text("Обов'язки") })
             }
+            if (tab == 2) {
+                DutiesTab(vm)
+            } else {
             Spacer(Modifier.height(8.dp))
             TopicFilterRow(
                 topics = topics,
@@ -200,6 +204,7 @@ fun HomeScreen(vm: DiaryViewModel, lockEnabled: Boolean, onToggleLock: (Boolean)
                         entryCards(dayEntries, topicById, showDate = false, vm = vm, horizontal = 16)
                     }
                 }
+            }
             }
         }
     }

@@ -49,4 +49,39 @@ interface DiaryDao {
 
     @Query("DELETE FROM voice_notes WHERE entryId = :entryId")
     suspend fun deleteNotesFor(entryId: Long)
+
+    // Обов'язки: підрозділи і посади
+    @Transaction
+    @Query("SELECT * FROM duty_units ORDER BY sortOrder, id")
+    fun observeUnits(): Flow<List<UnitWithPositions>>
+
+    @Query("SELECT * FROM duty_units WHERE name = :name LIMIT 1")
+    suspend fun unitByName(name: String): DutyUnit?
+
+    @Query("SELECT COALESCE(MAX(sortOrder), -1) + 1 FROM duty_units")
+    suspend fun nextUnitOrder(): Int
+
+    @Insert suspend fun insertUnit(unit: DutyUnit): Long
+    @Update suspend fun updateUnit(unit: DutyUnit)
+
+    @Query("DELETE FROM duty_units WHERE id = :id")
+    suspend fun deleteUnit(id: Long)
+
+    @Query("SELECT * FROM duty_positions WHERE unitId = :unitId")
+    suspend fun positionsFor(unitId: Long): List<DutyPosition>
+
+    @Query("SELECT * FROM duty_positions WHERE id = :id")
+    suspend fun position(id: Long): DutyPosition?
+
+    @Query("SELECT COALESCE(MAX(sortOrder), -1) + 1 FROM duty_positions WHERE unitId = :unitId")
+    suspend fun nextPositionOrder(unitId: Long): Int
+
+    @Insert suspend fun insertPosition(p: DutyPosition): Long
+    @Update suspend fun updatePosition(p: DutyPosition)
+
+    @Query("DELETE FROM duty_positions WHERE id = :id")
+    suspend fun deletePosition(id: Long)
+
+    @Query("DELETE FROM duty_positions WHERE unitId = :unitId")
+    suspend fun deletePositionsFor(unitId: Long)
 }

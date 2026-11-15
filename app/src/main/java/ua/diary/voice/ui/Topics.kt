@@ -109,7 +109,7 @@ fun TopicFilterRow(
     }
 
     if (adding) {
-        TopicNameDialog(
+        NameDialog(
             title = "Новий розділ",
             initial = "",
             onDismiss = { adding = false },
@@ -117,7 +117,7 @@ fun TopicFilterRow(
         )
     }
     editing?.let { t ->
-        TopicNameDialog(
+        NameDialog(
             title = "Розділ «${t.name}»",
             initial = t.name,
             onDismiss = { editing = null },
@@ -128,20 +128,23 @@ fun TopicFilterRow(
 }
 
 @Composable
-private fun TopicNameDialog(
+fun NameDialog(
     title: String,
     initial: String,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
     onDelete: (() -> Unit)? = null,
+    placeholder: String = "Назва, напр. «Робота»",
+    deleteTitle: String = "Видалити розділ?",
+    deleteText: String = "Записи залишаться, але будуть без розділу.",
 ) {
     var name by remember { mutableStateOf(initial) }
     var confirmDelete by remember { mutableStateOf(false) }
     if (confirmDelete && onDelete != null) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text("Видалити розділ?") },
-            text = { Text("Записи залишаться, але будуть без розділу.") },
+            title = { Text(deleteTitle) },
+            text = { Text(deleteText) },
             confirmButton = { TextButton(onClick = onDelete) { Text("Видалити") } },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Скасувати") } },
         )
@@ -152,7 +155,7 @@ private fun TopicNameDialog(
         title = { Text(title) },
         text = {
             OutlinedTextField(value = name, onValueChange = { name = it }, singleLine = true,
-                placeholder = { Text("Назва, напр. «Робота»") })
+                placeholder = { Text(placeholder) })
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(name) }, enabled = name.isNotBlank()) { Text("Зберегти") }
