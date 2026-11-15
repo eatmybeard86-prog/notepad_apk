@@ -2,6 +2,7 @@ package ua.diary.voice.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -89,17 +90,24 @@ fun EntryScreen(vm: DiaryViewModel, state: EditorState) {
         error?.let { snackbar.showSnackbar(it); vm.clearMessage() }
     }
 
-    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) vm.startRecording()
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+        val mic = result[Manifest.permission.RECORD_AUDIO]
+            ?: (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
+        if (mic) vm.startRecording()
+        else vm.showMessage("Без доступу до мікрофона запис неможливий")
     }
 
+    fun granted(p: String) = ContextCompat.checkSelfPermission(ctx, p) == PackageManager.PERMISSION_GRANTED
+
     fun onMic() {
-        when {
-            recording -> vm.stopRecording()
-            ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) ==
-                PackageManager.PERMISSION_GRANTED -> vm.startRecording()
-            else -> permission.launch(Manifest.permission.RECORD_AUDIO)
+        if (recording) { vm.stopRecording(); return }
+        // Сповіщення потрібне, щоб запис тривав при вимкненому екрані (Android 13+ питає дозвіл)
+        val needed = buildList {
+            if (!granted(Manifest.permission.RECORD_AUDIO)) add(Manifest.permission.RECORD_AUDIO)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                !granted(Manifest.permission.POST_NOTIFICATIONS)) add(Manifest.permission.POST_NOTIFICATIONS)
         }
+        if (needed.isEmpty()) vm.startRecording() else permission.launch(needed.toTypedArray())
     }
 
     Scaffold(

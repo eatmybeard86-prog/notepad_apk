@@ -22,6 +22,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import ua.diary.voice.audio.RecordingService
 import ua.diary.voice.audio.VoicePlayer
 import ua.diary.voice.audio.VoiceRecorder
 import ua.diary.voice.data.DiaryDatabase
@@ -255,6 +256,7 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
         val s = _editor.value ?: return
         saveJob?.cancel()
         recorder.stopAndDiscard()
+        RecordingService.stop(getApplication())
         _isRecording.value = false
         _recordPaused.value = false
         stopPlayback()
@@ -288,6 +290,8 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
             _message.value = "Не вдалося почати запис: ${e.message}"
             return
         }
+        // Щоб запис не обривався при вимкненому екрані
+        runCatching { RecordingService.start(getApplication()) }
         _isRecording.value = true
         viewModelScope.launch {
             while (isActive && recorder.isRecording) {
@@ -311,6 +315,7 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
         _recordPaused.value = false
         val s = _editor.value
         val result = recorder.stop()
+        RecordingService.stop(getApplication())
         _isRecording.value = false
         if (result == null) {
             _message.value = "Запис надто короткий"
@@ -411,6 +416,7 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
 
     override fun onCleared() {
         recorder.stopAndDiscard()
+        RecordingService.stop(getApplication())
         player.stop()
     }
 
