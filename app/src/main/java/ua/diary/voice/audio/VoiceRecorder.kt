@@ -11,8 +11,30 @@ class VoiceRecorder(private val context: Context) {
     private var recorder: MediaRecorder? = null
     private var file: File? = null
     private var startedAt = 0L
+    private var pausedAt = 0L
+    private var pausedTotal = 0L
 
     val isRecording get() = recorder != null
+    var isPaused = false
+        private set
+
+    fun pause() {
+        val r = recorder ?: return
+        if (isPaused) return
+        runCatching { r.pause() }.onSuccess {
+            isPaused = true
+            pausedAt = SystemClock.elapsedRealtime()
+        }
+    }
+
+    fun resume() {
+        val r = recorder ?: return
+        if (!isPaused) return
+        runCatching { r.resume() }.onSuccess {
+            pausedTotal += SystemClock.elapsedRealtime() - pausedAt
+            isPaused = false
+        }
+    }
 
     fun start(): File {
         stopAndDiscard()
@@ -37,10 +59,17 @@ class VoiceRecorder(private val context: Context) {
         recorder = r
         file = out
         startedAt = SystemClock.elapsedRealtime()
+        pausedTotal = 0L
+        isPaused = false
         return out
     }
 
-    fun elapsedMs(): Long = if (isRecording) SystemClock.elapsedRealtime() - startedAt else 0L
+    /** Тривалість запису без пауз. */
+    fun elapsedMs(): Long {
+        if (!isRecording) return 0L
+        val now = if (isPaused) pausedAt else SystemClock.elapsedRealtime()
+        return now - startedAt - pausedTotal
+    }
 
     /** Зупиняє запис і повертає файл з тривалістю, або null, якщо запис не вдався (наприклад, надто короткий). */
     fun stop(): Pair<File, Long>? {
@@ -49,6 +78,7 @@ class VoiceRecorder(private val context: Context) {
         val duration = elapsedMs()
         recorder = null
         file = null
+        isPaused = false
         return try {
             r.stop()
             r.release()

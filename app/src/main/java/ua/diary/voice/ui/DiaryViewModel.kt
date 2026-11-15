@@ -36,6 +36,14 @@ import ua.diary.voice.data.Topic
 import ua.diary.voice.data.VoiceNote
 
 /** Стан відкритого редактора. entryId == null — запис ще не збережено в базі. */
+/** Стан відтворення відкритої нотатки. */
+data class PlaybackState(
+    val noteId: Long,
+    val isPlaying: Boolean,
+    val positionMs: Long,
+    val durationMs: Long,
+)
+
 data class EditorState(
     val session: Long,
     val entryId: Long?,
@@ -233,6 +241,7 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
         saveJob?.cancel()
         recorder.stopAndDiscard()
         _isRecording.value = false
+        _recordPaused.value = false
         stopPlayback()
         _editor.value = null
         viewModelScope.launch {
@@ -274,7 +283,17 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private val _recordPaused = MutableStateFlow(false)
+    val recordPaused = _recordPaused.asStateFlow()
+
+    fun toggleRecordPause() {
+        if (!recorder.isRecording) return
+        if (recorder.isPaused) recorder.resume() else recorder.pause()
+        _recordPaused.value = recorder.isPaused
+    }
+
     fun stopRecording() {
+        _recordPaused.value = false
         val s = _editor.value
         val result = recorder.stop()
         _isRecording.value = false
@@ -291,22 +310,63 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // ---------- Відтворення ----------
-    private val _playingId = MutableStateFlow<Long?>(null)
-    val playingId = _playingId.asStateFlow()
+    private val _playback = MutableStateFlow<PlaybackState?>(null)
+    val playback = _playback.asStateFlow()
+    private var tickJob: Job? = null
 
-    fun togglePlay(note: VoiceNote) {
-        if (_playingId.value == note.id) { stopPlayback(); return }
-        player.play(note.filePath) { _playingId.value = null }
-        _playingId.value = if (player.playingPath != null) note.id else null
+    private fun refreshPlayback() {
+        val cur = _playback.value ?: return
+        _playback.value = cur.copy(
+            isPlaying = player.isPlaying,
+            positionMs = player.positionMs(),
+            durationMs = player.durationMs().takeIf { it > 0 } ?: cur.durationMs,
+        )
     }
 
+    /** Кнопка «відтворити/пауза» на нотатці. */
+    fun togglePlay(note: VoiceNote) {
+        val cur = _playback.value
+        if (cur != null && cur.noteId == note.id) {
+            if (player.isPlaying) player.pause() else player.resume()
+            refreshPlayback()
+            return
+        }
+        val ok = player.play(note.filePath) {
+            // Дійшли до кінця: залишаємо нотатку відкритою на початку, на паузі
+            player.pause()
+            player.seekTo(0)
+            refreshPlayback()
+        }
+        if (!ok) {
+            _playback.value = null
+            _message.value = "Не вдалося відтворити запис"
+            return
+        }
+        _playback.value = PlaybackState(note.id, true, 0, player.durationMs().takeIf { it > 0 } ?: note.durationMs)
+        tickJob?.cancel()
+        tickJob = viewModelScope.launch {
+            while (isActive && player.isActive) {
+                refreshPlayback()
+                delay(200)
+            }
+        }
+    }
+
+    fun seekTo(ms: Long) {
+        player.seekTo(ms)
+        refreshPlayback()
+    }
+
+    fun skip(deltaMs: Long) = seekTo(player.positionMs() + deltaMs)
+
     fun stopPlayback() {
+        tickJob?.cancel()
         player.stop()
-        _playingId.value = null
+        _playback.value = null
     }
 
     fun deleteNote(note: VoiceNote) {
-        if (_playingId.value == note.id) stopPlayback()
+        if (_playback.value?.noteId == note.id) stopPlayback()
         viewModelScope.launch { repo.deleteVoiceNote(note) }
     }
 
