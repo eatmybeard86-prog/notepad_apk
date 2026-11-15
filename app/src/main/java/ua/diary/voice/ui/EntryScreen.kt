@@ -26,7 +26,10 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Forward10
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.PlayArrow
@@ -66,6 +69,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ua.diary.voice.data.VoiceNote
 import java.text.DateFormat
+import java.io.File
 import java.util.Date
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -95,6 +99,16 @@ fun EntryScreen(vm: DiaryViewModel, state: EditorState) {
             ?: (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
         if (mic) vm.startRecording()
         else vm.showMessage("Без доступу до мікрофона запис неможливий")
+    }
+
+    // Нотатка, яку зараз зберігаємо на телефон
+    var saveTarget by remember { mutableStateOf<VoiceNote?>(null) }
+    val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("audio/mp4")) { uri ->
+        val note = saveTarget
+        saveTarget = null
+        if (uri != null && note != null) {
+            vm.showMessage(if (copyFileTo(ctx, File(note.filePath), uri)) "Аудіо збережено" else "Не вдалося зберегти аудіо")
+        }
     }
 
     fun granted(p: String) = ContextCompat.checkSelfPermission(ctx, p) == PackageManager.PERMISSION_GRANTED
@@ -222,6 +236,14 @@ fun EntryScreen(vm: DiaryViewModel, state: EditorState) {
                     onSkip = vm::skip,
                     onClose = vm::stopPlayback,
                     onDelete = { vm.deleteNote(note) },
+                    onShare = {
+                        shareDocument(ctx, File(note.filePath), "audio/mp4", voiceFileName(date, note))
+                    },
+                    onSave = {
+                        saveTarget = note
+                        ExternalLaunch.mark()
+                        saveLauncher.launch(voiceFileName(date, note))
+                    },
                 )
             }
         }
@@ -249,7 +271,10 @@ private fun VoiceNoteRow(
     onSkip: (Long) -> Unit,
     onClose: () -> Unit,
     onDelete: () -> Unit,
+    onShare: () -> Unit,
+    onSave: () -> Unit,
 ) {
+    var menu by remember { mutableStateOf(false) }
     val time = remember(note.createdAt) {
         DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(note.createdAt))
     }
@@ -271,7 +296,20 @@ private fun VoiceNoteRow(
             if (playback != null) {
                 IconButton(onClick = onClose) { Icon(Icons.Default.Stop, "Зупинити") }
             }
-            IconButton(onClick = onDelete) { Icon(Icons.Default.DeleteOutline, "Видалити нотатку") }
+            Box {
+                IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "Дії з нотаткою") }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(text = { Text("Надіслати") },
+                        leadingIcon = { Icon(Icons.Default.Share, null) },
+                        onClick = { menu = false; onShare() })
+                    DropdownMenuItem(text = { Text("Зберегти на телефон") },
+                        leadingIcon = { Icon(Icons.Default.Download, null) },
+                        onClick = { menu = false; onSave() })
+                    DropdownMenuItem(text = { Text("Видалити") },
+                        leadingIcon = { Icon(Icons.Default.DeleteOutline, null) },
+                        onClick = { menu = false; onDelete() })
+                }
+            }
         }
         if (playback != null) {
             // Під час перетягування показуємо позицію пальця, а не плеєра
@@ -303,4 +341,10 @@ private fun VoiceNoteRow(
             }
         }
     }
+}
+
+/** Зрозуміла назва файлу для збереження/пересилання: Щоденник_2026-11-15_19-30.m4a */
+private fun voiceFileName(date: Long, note: VoiceNote): String {
+    val time = java.text.SimpleDateFormat("HH-mm-ss", java.util.Locale.US).format(Date(note.createdAt))
+    return "Щоденник_${java.time.LocalDate.ofEpochDay(date)}_$time.m4a"
 }

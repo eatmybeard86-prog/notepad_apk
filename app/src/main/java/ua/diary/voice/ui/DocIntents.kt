@@ -46,3 +46,8 @@ fun shareDocument(ctx: Context, file: File, mime: String, title: String) {
     ExternalLaunch.mark()
     ctx.startActivity(Intent.createChooser(send, "Надіслати"))
 }
+
+/** Копіює файл нотатки за адресою, яку користувач вибрав у системному діалозі «Зберегти». */
+fun copyFileTo(ctx: Context, file: File, target: android.net.Uri): Boolean = runCatching {
+    ctx.contentResolver.openOutputStream(target)!!.use { out -> file.inputStream().use { it.copyTo(out) } }
+}.isSuccess
