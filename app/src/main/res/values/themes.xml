@@ -1,0 +1,3 @@
+<resources>
+    <style name="Theme.VoiceDiary" parent="Theme.AppCompat.DayNight.NoActionBar" />
+</resources>
